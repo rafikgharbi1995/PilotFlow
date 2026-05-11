@@ -27,11 +27,11 @@ if 'magasin_present' not in st.session_state:
 
 # Variables pour le module Stock
 if 'stock_initial' not in st.session_state:
-    st.session_state.stock_initial = None       # DataFrame avec Produit, Quantité Initiale
+    st.session_state.stock_initial = None
 if 'mouvements' not in st.session_state:
     st.session_state.mouvements = pd.DataFrame(columns=['Date', 'Produit', 'Type', 'Quantité'])
 if 'stock_seuils' not in st.session_state:
-    st.session_state.stock_seuils = {}          # dict produit -> seuil minimal
+    st.session_state.stock_seuils = {}
 
 # ==========================================
 # 2. PAGE DE CONNEXION / INSCRIPTION
@@ -84,8 +84,12 @@ else:
 
         if uploaded_file is not None:
             try:
+                # --- LECTURE AVEC GESTION D'ENCODAGE POUR CSV ---
                 if uploaded_file.name.endswith('.csv'):
-                    df_brut = pd.read_csv(uploaded_file, sep=None, engine='python')
+                    try:
+                        df_brut = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
+                    except UnicodeDecodeError:
+                        df_brut = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin-1')
                 elif uploaded_file.name.endswith('.xlsx'):
                     df_brut = pd.read_excel(uploaded_file, engine='openpyxl')
                 elif uploaded_file.name.endswith('.xls'):
@@ -244,7 +248,7 @@ else:
                 st.plotly_chart(fig3, use_container_width=True)
 
     # ============================================================
-    # 🆕 PAGE 3 : GESTION DE STOCK
+    # PAGE 3 : GESTION DE STOCK
     # ============================================================
     elif menu == "📦 Gestion de Stock":
         st.title("📦 Gestion de Stock")
@@ -252,7 +256,6 @@ else:
 
         tab1, tab2, tab3 = st.tabs(["📋 Stock Actuel", "➕ Nouveau mouvement", "⚙️ Initialisation & Paramètres"])
 
-        # Fonctions utilitaires (placées ici pour rester dans le scope)
         def calculer_stock_actuel():
             if st.session_state.stock_initial is None:
                 return pd.DataFrame(columns=['Produit', 'Quantité Initiale', 'Total Entrées', 'Total Sorties', 'Stock Final'])
@@ -294,7 +297,6 @@ else:
                 if alertes:
                     st.error(f"⚠️ Stock critique pour : {', '.join(alertes)}")
 
-                # Filtre recherche
                 recherche = st.text_input("🔍 Rechercher un produit")
                 if recherche:
                     stock_affiche = stock_actuel[stock_actuel['Produit'].str.contains(recherche, case=False)]
@@ -309,7 +311,6 @@ else:
                     use_container_width=True
                 )
 
-                # Graphique des stocks
                 fig_stock = px.bar(stock_actuel, x='Produit', y='Stock Final',
                                    title="Niveau de stock par produit",
                                    color='Stock Final',
@@ -347,7 +348,6 @@ else:
                         st.success("Mouvement enregistré !")
                         st.rerun()
 
-                # Historique des mouvements
                 st.divider()
                 st.subheader("Historique des mouvements")
                 if not st.session_state.mouvements.empty:
@@ -364,9 +364,14 @@ else:
             if stock_file is not None:
                 try:
                     if stock_file.name.endswith('.csv'):
-                        df_stock = pd.read_csv(stock_file, sep=None, engine='python')
+                        try:
+                            df_stock = pd.read_csv(stock_file, sep=None, engine='python', encoding='utf-8')
+                        except UnicodeDecodeError:
+                            df_stock = pd.read_csv(stock_file, sep=None, engine='python', encoding='latin-1')
+                    elif stock_file.name.endswith('.xlsx'):
+                        df_stock = pd.read_excel(stock_file, engine='openpyxl')
                     else:
-                        df_stock = pd.read_excel(stock_file, engine='openpyxl' if stock_file.name.endswith('.xlsx') else 'xlrd')
+                        df_stock = pd.read_excel(stock_file, engine='xlrd')
 
                     if 'Produit' not in df_stock.columns or 'Quantité Initiale' not in df_stock.columns:
                         st.error("Le fichier doit contenir les colonnes 'Produit' et 'Quantité Initiale'.")
