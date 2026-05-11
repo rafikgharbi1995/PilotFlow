@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 from datetime import datetime
+import csv
+from io import BytesIO
 
 # ==========================================
 # NOM DE L'APPLICATION – modifiable ici
@@ -32,6 +34,44 @@ if 'mouvements' not in st.session_state:
     st.session_state.mouvements = pd.DataFrame(columns=['Date', 'Produit', 'Type', 'Quantité'])
 if 'stock_seuils' not in st.session_state:
     st.session_state.stock_seuils = {}
+
+# ==========================================
+# FONCTION ROBUSTE DE LECTURE CSV
+# ==========================================
+def read_csv_robust(uploaded_file):
+    """Lit un fichier CSV avec détection automatique du délimiteur et de l'encodage."""
+    content = uploaded_file.read()
+    # Sauvegarde pour réutiliser en BytesIO après
+    buffer = BytesIO(content)
+
+    # 1. Essayer de détecter le délimiteur à partir du contenu
+    try:
+        # On prend les premiers octets pour sniffer
+        sample = content[:2048].decode('utf-8', errors='ignore')
+        sniffer = csv.Sniffer()
+        delimiter = sniffer.sniff(sample).delimiter
+    except:
+        delimiter = None
+
+    # 2. Liste des séparateurs à tester (détecté en priorité, puis virgule, point-virgule, tab)
+    if delimiter:
+        seps_to_try = [delimiter, ',', ';', '\t']
+    else:
+        seps_to_try = [',', ';', '\t']
+
+    # 3. Liste des encodages à essayer
+    encodings_to_try = ['utf-8', 'latin-1']
+
+    for encoding in encodings_to_try:
+        for sep in seps_to_try:
+            try:
+                buffer.seek(0)
+                return pd.read_csv(buffer, sep=sep, encoding=encoding)
+            except:
+                continue
+
+    # Si rien ne fonctionne
+    raise ValueError("Impossible de lire le fichier CSV. Vérifiez le séparateur et l'encodage.")
 
 # ==========================================
 # 2. PAGE DE CONNEXION / INSCRIPTION
@@ -84,12 +124,9 @@ else:
 
         if uploaded_file is not None:
             try:
-                # --- LECTURE AVEC GESTION D'ENCODAGE POUR CSV ---
+                # --- LECTURE DU FICHIER ---
                 if uploaded_file.name.endswith('.csv'):
-                    try:
-                        df_brut = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='utf-8')
-                    except UnicodeDecodeError:
-                        df_brut = pd.read_csv(uploaded_file, sep=None, engine='python', encoding='latin-1')
+                    df_brut = read_csv_robust(uploaded_file)
                 elif uploaded_file.name.endswith('.xlsx'):
                     df_brut = pd.read_excel(uploaded_file, engine='openpyxl')
                 elif uploaded_file.name.endswith('.xls'):
@@ -359,15 +396,15 @@ else:
         # --- Onglet 3 : Initialisation et paramètres ---
         with tab3:
             st.subheader("📂 Initialiser le stock depuis un fichier")
-            stock_file = st.file_uploader("Importer un fichier (CSV ou Excel) avec les colonnes : Produit, Quantité Initiale",
-                                          type=['csv', 'xlsx', 'xls'], key="stock_uploader")
+            stock_file = st.file_uploader(
+                "Importer un fichier (CSV ou Excel) avec les colonnes : Produit, Quantité Initiale",
+                type=['csv', 'xlsx', 'xls'],
+                key="stock_uploader"
+            )
             if stock_file is not None:
                 try:
                     if stock_file.name.endswith('.csv'):
-                        try:
-                            df_stock = pd.read_csv(stock_file, sep=None, engine='python', encoding='utf-8')
-                        except UnicodeDecodeError:
-                            df_stock = pd.read_csv(stock_file, sep=None, engine='python', encoding='latin-1')
+                        df_stock = read_csv_robust(stock_file)
                     elif stock_file.name.endswith('.xlsx'):
                         df_stock = pd.read_excel(stock_file, engine='openpyxl')
                     else:
