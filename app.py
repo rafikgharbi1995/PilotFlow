@@ -27,7 +27,6 @@ if 'nom_entreprise' not in st.session_state:
 if 'magasin_present' not in st.session_state:
     st.session_state.magasin_present = False
 
-# Variables pour le module Stock
 if 'stock_initial' not in st.session_state:
     st.session_state.stock_initial = None
 if 'mouvements' not in st.session_state:
@@ -39,27 +38,17 @@ if 'stock_seuils' not in st.session_state:
 # FONCTION ROBUSTE DE LECTURE CSV
 # ==========================================
 def read_csv_robust(uploaded_file):
-    """Lit un fichier CSV avec détection automatique du délimiteur et de l'encodage."""
     content = uploaded_file.read()
-    # Sauvegarde pour réutiliser en BytesIO après
     buffer = BytesIO(content)
 
-    # 1. Essayer de détecter le délimiteur à partir du contenu
     try:
-        # On prend les premiers octets pour sniffer
         sample = content[:2048].decode('utf-8', errors='ignore')
         sniffer = csv.Sniffer()
         delimiter = sniffer.sniff(sample).delimiter
     except:
         delimiter = None
 
-    # 2. Liste des séparateurs à tester (détecté en priorité, puis virgule, point-virgule, tab)
-    if delimiter:
-        seps_to_try = [delimiter, ',', ';', '\t']
-    else:
-        seps_to_try = [',', ';', '\t']
-
-    # 3. Liste des encodages à essayer
+    seps_to_try = [delimiter, ',', ';', '\t'] if delimiter else [',', ';', '\t']
     encodings_to_try = ['utf-8', 'latin-1']
 
     for encoding in encodings_to_try:
@@ -70,7 +59,6 @@ def read_csv_robust(uploaded_file):
             except:
                 continue
 
-    # Si rien ne fonctionne
     raise ValueError("Impossible de lire le fichier CSV. Vérifiez le séparateur et l'encodage.")
 
 # ==========================================
@@ -99,16 +87,13 @@ if not st.session_state.logged_in:
 # 3. ESPACE CLIENT
 # ==========================================
 else:
-    # --- SIDEBAR ---
     st.sidebar.title(f"🏢 {st.session_state.nom_entreprise}")
     menu = st.sidebar.radio(
         "Menu Principal",
-        [
-            "🔌 Étape 1 : Import & Configuration",
-            "📊 Étape 2 : Mon Dashboard",
-            "📦 Gestion de Stock",
-            "🚪 Déconnexion"
-        ]
+        ["🔌 Étape 1 : Import & Configuration",
+         "📊 Étape 2 : Mon Dashboard",
+         "📦 Gestion de Stock",
+         "🚪 Déconnexion"]
     )
 
     # ============================================================
@@ -124,7 +109,6 @@ else:
 
         if uploaded_file is not None:
             try:
-                # --- LECTURE DU FICHIER ---
                 if uploaded_file.name.endswith('.csv'):
                     df_brut = read_csv_robust(uploaded_file)
                 elif uploaded_file.name.endswith('.xlsx'):
@@ -143,7 +127,6 @@ else:
 
                 st.divider()
 
-                # --- MAPPING ---
                 st.subheader("⚙️ Aidez-nous à comprendre vos données")
                 col1, col2 = st.columns(2)
                 with col1:
@@ -340,8 +323,9 @@ else:
                 else:
                     stock_affiche = stock_actuel
 
+                # ✅ Correction pandas 3.0 : applymap -> map
                 st.dataframe(
-                    stock_affiche.style.applymap(
+                    stock_affiche.style.map(
                         lambda val: 'background-color: #ffcccc' if (isinstance(val, (int, float)) and val < 0) else '',
                         subset=['Stock Final']
                     ),
